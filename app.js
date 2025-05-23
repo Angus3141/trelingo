@@ -17,7 +17,10 @@ options.forEach(option => {
 });
 
 function playAudio() {
-  document.getElementById("audio").play();
+  const utterance = new SpeechSynthesisUtterance("chat");
+  utterance.lang = "it-IT"; // Use Italian voice
+  utterance.rate = 0.9;
+  speechSynthesis.speak(utterance);
 }
 
 function checkAnswer() {
@@ -26,10 +29,4 @@ function checkAnswer() {
   } else {
     alert("Try again.");
   }
-}
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-    .then(reg => console.log('Service Worker registered'))
-    .catch(err => console.error('Service Worker error:', err));
 }
