@@ -1,18 +1,50 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  background: black;
-  height: 100%;
-  overflow: hidden;
-  touch-action: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding: 20px;
 }
 
-canvas {
-  display: block;
-  position: fixed;
-  top: 0;
-  left: 0;
-  background: #111;
+.audio-button {
+  font-size: 40px;
+  background: #1cb0f6;
+  color: white;
+  border: none;
+  border-radius: 15px;
+  padding: 20px;
+  margin: 20px 0;
+  cursor: pointer;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.option {
+  padding: 15px;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.option:hover {
+  background: #f0f0f0;
+}
+
+.option.selected {
+  border-color: #1cb0f6;
+  background: #e0f5ff;
+}
+
+#checkButton {
+  background: limegreen;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  font-size: 18px;
+  border-radius: 8px;
+  cursor: pointer;
 }
