@@ -1,10 +1,11 @@
 {
-  "name": "Trelingo",
-  "short_name": "Trelingo",
+  "name": "Pong Game",
+  "short_name": "Pong",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#34d399",
+  "background_color": "#000000",
+  "theme_color": "#ffffff",
+  "orientation": "landscape",
   "icons": [
     {
       "src": "icon-192.png",
