@@ -23,7 +23,6 @@
     const { useState, useEffect, useMemo } = React;
 
     /* ---------------------- UTILITIES ---------------------- */
-    // Italian voice loader
     let itVoice = null;
     function loadVoices() {
       const voices = speechSynthesis.getVoices();
@@ -51,9 +50,7 @@
             if (!tmp[h]) tmp[h] = [];
             try {
               if (row[i]) tmp[h].push(JSON.parse(row[i]));
-            } catch (err) {
-              /* ignore malformed cells */
-            }
+            } catch (err) {/* ignore bad JSON */}
           } else {
             tmp[h] = row[i];
           }
@@ -164,8 +161,8 @@
 
       const levels = useMemo(() => topics ? [...new Set(topics.map(t => t.level))] : [], [topics]);
       const unitsByLevel = useMemo(() => {
-        if (!topics) return {};
         const m = {};
+        if (!topics) return m;
         topics.forEach(t => {
           if (!m[t.level]) m[t.level] = new Set();
           m[t.level].add(t.unit);
@@ -173,9 +170,10 @@
         Object.keys(m).forEach(k => m[k] = [...m[k]]);
         return m;
       }, [topics]);
+
       const topicsByUnit = useMemo(() => {
-        if (!topics) return {};
         const m = {};
+        if (!topics) return m;
         topics.forEach(t => {
           if (!m[t.unit]) m[t.unit] = [];
           m[t.unit].push(t);
@@ -199,17 +197,4 @@
                 <Pill title="LEVEL" label={lvl} color={pal[0]} onClick={() => {}} />
                 <div className="pl-4 space-y-2">
                   {unitsByLevel[lvl].map(u => (
-                    <div key={u} className="space-y-2">
-                      <Pill title="UNIT" label={u} color={pal[1]} onClick={() => {}} />
-                      <div className="pl-4 space-y-2">
-                        {topicsByUnit[u].map(t => (
-                          <Pill key={t.topic} label={t.topic} color={pal[2]} onClick={() => setActive(t.topic)} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </
+                    <div key={
