@@ -1,29 +1,299 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="My Web App">
-  <link rel="apple-touch-icon" href="icon.png">
-  <link rel="manifest" href="manifest.json">
-  <title>My Web App</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 2rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-  </style>
+  <title>Italian Quiz</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  />
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel (for JSX) -->
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 </head>
-<body>
-  <h1>Welcome to My Web App</h1>
-  <p>This is running full screen like a native app!</p>
+
+<body class="bg-gray-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Load Italian voice
+    let italianVoice = null;
+    function loadVoices() {
+      const voices = speechSynthesis.getVoices();
+      italianVoice = voices.find(v => v.name === 'Alice' && v.lang === 'it-IT')
+                    || voices.find(v => v.lang === 'it-IT');
+    }
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    function safeSpeak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'it-IT';
+      if (italianVoice) utter.voice = italianVoice;
+      speechSynthesis.speak(utter);
+    }
+
+    const paletteSets = {
+      A1: ['#84cc16','#a3e635','#bef264'],
+      A2: ['#3b82f6','#60a5fa','#93c5fd'],
+      A3: ['#ef4444','#f87171','#fca5a5']
+    };
+    const defaultPalette = ['#7e22ce','#a78bfa','#c4b5fd'];
+    const completedColor = '#9ca3af';
+
+    function Pill({ title, label, icon='fa-arrow-right', bgColor, active, onClick }) {
+      return (
+        <button
+          onClick={onClick}
+          style={{ backgroundColor: bgColor, borderColor: bgColor }}
+          className={`relative w-full text-left rounded-lg border flex flex-col px-4 py-2 transition hover:opacity-80 focus:outline-none ${active ? 'ring-2 ring-blue-300 shadow' : ''}`}
+        >
+          {title && <span className="text-xs font-normal text-white mb-1">{title}</span>}
+          <span className="text-base font-semibold text-white">{label}</span>
+          <i className={`fa ${icon} text-white absolute right-3 top-1/2 transform -translate-y-1/2`} />
+        </button>
+      );
+    }
+
+    function Loader() {
+      return (
+        <div className="fixed inset-0 flex justify-center items-center bg-white z-50">
+          <div className="text-lg font-semibold text-gray-500">Loading...</div>
+        </div>
+      );
+    }
+
+    function parseTsvData(tsv) {
+      const lines = tsv.trim().split("\n").map(row => row.split("\t"));
+      const headers = lines[0];
+      return lines.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((key, i) => {
+          if (key.includes("Correct words") || key.includes("Distractors")) {
+            if (!obj[key]) obj[key] = [];
+            try {
+              obj[key].push(JSON.parse(row[i]));
+            } catch {}
+          } else {
+            obj[key] = row[i];
+          }
+        });
+
+        return {
+          topic: obj["Topic name"],
+          langCode: obj["Language code"],
+          unit: obj["Unit"],
+          level: obj["Level"],
+          correct: Object.entries(obj).filter(([k]) => k.includes("Correct words")).flatMap(([_, v]) => v),
+          distractors: Object.entries(obj).filter(([k]) => k.includes("Distractors")).flatMap(([_, v]) => v)
+        };
+      });
+    }
+
+    function Quiz({ meta, prompts, distractors, onBack }) {
+      const TOTAL = 20;
+      const [cur, setCur] = useState(null);
+      const [opts, setOpts] = useState([]);
+      const [pick, setPick] = useState(null);
+      const [count, setCount] = useState(0);
+      const [fb, setFb] = useState(null);
+
+      const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+      useEffect(() => { if (prompts.length && distractors.length) nextQ(); }, [prompts, distractors]);
+
+      function nextQ() {
+        const p = prompts[Math.floor(Math.random() * prompts.length)];
+        const wrong = shuffle(prompts.filter(x => x !== p))[0];
+        const extra = shuffle(distractors).slice(0, 2);
+        setCur(p);
+        setOpts(shuffle([p.it, wrong.it, ...extra.map(e => e.it)]));
+        setPick(null); setFb(null);
+        safeSpeak(p.it);
+      }
+
+      function check() {
+        if (!cur) return;
+        if (pick === cur.it) {
+          setFb('correct');
+          setCount(c => c + 1);
+          setTimeout(() => count + 1 < TOTAL ? nextQ() : onBack(), 800);
+        } else {
+          setFb('wrong');
+          safeSpeak(cur.it);
+        }
+      }
+
+      const prog = Math.round((count / TOTAL) * 100);
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <button onClick={onBack} className="text-gray-400 mr-4">
+              <i className="fa fa-xmark fa-lg" />
+            </button>
+            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500" style={{ width: `${prog}%` }} />
+            </div>
+          </div>
+
+          <button
+            onClick={() => cur && safeSpeak(cur.it)}
+            className="bg-blue-500 text-white rounded-full w-20 h-20 mx-auto flex items-center justify-center shadow"
+          >
+            <i className="fa fa-volume-up fa-2x" />
+          </button>
+
+          <div className="space-y-4">
+            {opts.map(o => (
+              <button
+                key={o}
+                onClick={() => setPick(o)}
+                className={`w-full py-2 px-4 rounded-lg border text-left ${pick === o ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+
+          {fb === 'correct' && (
+            <div className="p-6 rounded-lg bg-green-50 border-green-300 shadow text-center space-y-2">
+              <div className="text-2xl font-bold text-green-600">Bravo!</div>
+              <div className="text-green-700">Ottimo lavoro!</div>
+            </div>
+          )}
+          {fb === 'wrong' && (
+            <div className="p-6 rounded-lg bg-red-50 border-red-300 shadow text-center space-y-2">
+              <div className="text-2xl font-bold text-red-600">Oops!</div>
+              <div className="text-red-700">
+                La risposta corretta era <strong>{cur.it}</strong>.
+              </div>
+            </div>
+          )}
+
+          {fb ? (
+            <div className="text-center">
+              <button onClick={() => setFb(null)} className="mt-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Continua
+              </button>
+            </div>
+          ) : (
+            <button disabled={!pick} onClick={check} className="w-full py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">
+              Controlla
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    function Browser() {
+      const [list, setList] = useState(null);
+      const [topic, setTopic] = useState('');
+      const [quiz, setQuiz] = useState(null);
+
+      useEffect(() => {
+        fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vRJELEbRqHtvqYSiDxrJ0ZTASU2IDmmpICfkU4JIt3xlnd66xbhZ4KJgtDY29Fe3XR3TD0n76rSBE6y/pub?output=tsv")
+          .then(res => res.text())
+          .then(parseTsvData)
+          .then(setList);
+      }, []);
+
+      function openTopic(t) {
+        setTopic(t);
+        const topicData = list.find(x => x.topic === t);
+        setQuiz(topicData);
+      }
+
+      const levels = useMemo(() => list ? Array.from(new Set(list.map(x => x.level))) : [], [list]);
+      const unitsByLevel = useMemo(() => {
+        const m = {};
+        if (list) {
+          list.forEach(x => {
+            if (!m[x.level]) m[x.level] = [];
+            if (!m[x.level].includes(x.unit)) m[x.level].push(x.unit);
+          });
+        }
+        return m;
+      }, [list]);
+      const topicsByUnit = useMemo(() => {
+        const m = {};
+        if (list) {
+          list.forEach(x => {
+            if (!m[x.unit]) m[x.unit] = [];
+            m[x.unit].push(x);
+          });
+        }
+        return m;
+      }, [list]);
+
+      return (
+        <div className="p-4 max-w-md mx-auto space-y-4">
+          {!topic ? (
+            list === null ? <Loader /> : (
+              <div className="space-y-4">
+                {levels.map(l => {
+                  const set = paletteSets[l] || defaultPalette;
+                  return (
+                    <div key={l}>
+                      <Pill
+                        title="LEVEL"
+                        label={l}
+                        bgColor={set[0]}
+                        active={false}
+                        onClick={() => {}}
+                      />
+                      <div className="pl-4 space-y-4">
+                        {unitsByLevel[l].map(u => (
+                          <div key={u}>
+                            <Pill
+                              title="UNIT"
+                              label={u}
+                              bgColor={set[1]}
+                              active={false}
+                              onClick={() => {}}
+                            />
+                            <div className="pl-4 space-y-4">
+                              {topicsByUnit[u].map(t => (
+                                <Pill
+                                  key={t.topic}
+                                  label={t.topic}
+                                  bgColor={set[2]}
+                                  onClick={() => openTopic(t.topic)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : quiz === null ? <Loader /> : (
+            <Quiz
+              meta={quiz}
+              prompts={quiz.correct}
+              distractors={quiz.distractors}
+              onBack={() => {
+                setTopic('');
+                setQuiz(null);
+              }}
+            />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<Browser />, document.getElementById('root'));
+  </script>
 </body>
 </html>
