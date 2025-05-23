@@ -17,10 +17,25 @@ options.forEach(option => {
 });
 
 function playAudio() {
-  const utterance = new SpeechSynthesisUtterance("chat");
-  utterance.lang = "it-IT"; // Use Italian voice
-  utterance.rate = 0.9;
-  speechSynthesis.speak(utterance);
+  const synth = window.speechSynthesis;
+
+  // Wait until voices are loaded
+  const waitForVoices = setInterval(() => {
+    const voices = synth.getVoices();
+    if (voices.length !== 0) {
+      clearInterval(waitForVoices);
+
+      // Try to find the Italian voice "Luca"
+      const italianVoice = voices.find(voice => voice.name === "Luca" || (voice.lang === "it-IT" && voice.name.toLowerCase().includes("luca")));
+
+      const utterance = new SpeechSynthesisUtterance("chat");
+      utterance.voice = italianVoice || voices.find(v => v.lang === "it-IT");
+      utterance.lang = "it-IT";
+      utterance.rate = 0.9;
+
+      synth.speak(utterance);
+    }
+  }, 100);
 }
 
 function checkAnswer() {
