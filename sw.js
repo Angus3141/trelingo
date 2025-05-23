@@ -1,10 +1,14 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let width = window.innerWidth * 0.9;
-let height = window.innerHeight * 0.7;
+const width = 800;
+const height = 500;
 canvas.width = width;
 canvas.height = height;
+canvas.style.width = `${width}px`;
+canvas.style.height = `${height}px`;
+
+// Now canvas will stay locked even if iOS rotates or resizes.
 
 const paddleWidth = 10;
 const paddleHeight = 100;
