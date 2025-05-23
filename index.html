@@ -9,250 +9,207 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Font Awesome -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-  />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <!-- React & ReactDOM (UMD builds) -->
   <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
-  <!-- Babel 7 for on‑the‑fly JSX compilation -->
+  <!-- Babel (for inline JSX) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-
 <body class="bg-gray-50">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    /* -------------------------------------------------------------
-     *  UTILITIES
-     * -----------------------------------------------------------*/
-
-    // Load an Italian voice if available
-    let italianVoice = null;
+    /* ---------------------- UTILITIES ---------------------- */
+    // Italian voice loader
+    let itVoice = null;
     function loadVoices() {
-      italianVoice = speechSynthesis.getVoices().find(v => v.lang === 'it-IT' && (v.name === 'Alice' || v.default))
-                     || speechSynthesis.getVoices().find(v => v.lang === 'it-IT');
+      const voices = speechSynthesis.getVoices();
+      itVoice = voices.find(v => v.lang === 'it-IT' && (v.name === 'Alice' || v.default)) || voices.find(v => v.lang === 'it-IT');
     }
     speechSynthesis.onvoiceschanged = loadVoices;
     loadVoices();
 
-    function safeSpeak(text) {
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'it-IT';
-      if (italianVoice) utter.voice = italianVoice;
-      speechSynthesis.speak(utter);
-    }
+    const speak = text => {
+      if (!text) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'it-IT';
+      if (itVoice) u.voice = itVoice;
+      speechSynthesis.speak(u);
+    };
 
-    // Convert Google‑Sheets TSV to structured objects
-    function parseTsvData(tsv) {
-      const rows = tsv.trim().split("\n").map(r => r.split("\t"));
+    // Parse TSV published by Google Sheets -> objects
+    function parseTsv(tsv) {
+      const rows = tsv.trim().split('\n').map(r => r.split('\t'));
       const headers = rows[0];
-
       return rows.slice(1).map(row => {
         const tmp = {};
         headers.forEach((h, i) => {
           if (h.startsWith('Correct words') || h.startsWith('Distractors')) {
             if (!tmp[h]) tmp[h] = [];
             try {
-              tmp[h].push(JSON.parse(row[i]));
+              if (row[i]) tmp[h].push(JSON.parse(row[i]));
             } catch (err) {
-              // ignore empty / bad cells
+              /* ignore malformed cells */
             }
           } else {
             tmp[h] = row[i];
           }
         });
-
         return {
-          topic:      tmp['Topic name'],
-          langCode:   tmp['Language code'],
-          unit:       tmp['Unit'],
-          level:      tmp['Level'],
-          correct:    Object.entries(tmp).filter(([k]) => k.startsWith('Correct words')).flatMap(([_, v]) => v),
-          distractors:Object.entries(tmp).filter(([k]) => k.startsWith('Distractors')).flatMap(([_, v]) => v)
+          topic: tmp['Topic name'],
+          lang: tmp['Language code'],
+          unit: tmp['Unit'],
+          level: tmp['Level'],
+          correct: Object.entries(tmp).filter(([k]) => k.startsWith('Correct words')).flatMap(([, v]) => v),
+          distractors: Object.entries(tmp).filter(([k]) => k.startsWith('Distractors')).flatMap(([, v]) => v)
         };
       });
     }
 
-    /* -------------------------------------------------------------
-     *  UI COMPONENTS
-     * -----------------------------------------------------------*/
-
-    function Loader() {
-      return (
-        <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
-          <span className="text-gray-500 text-lg font-medium">Caricamento…</span>
-        </div>
-      );
-    }
-
-    const paletteSets = {
-      A1: ['#84cc16','#bef264','#d9f99d'],
-      A2: ['#3b82f6','#93c5fd','#bfdbfe'],
-      A3: ['#ef4444','#fca5a5','#fecaca']
+    /* ---------------------- UI ELEMENTS -------------------- */
+    const palette = {
+      A1: ['#84cc16', '#bef264', '#d9f99d'],
+      A2: ['#3b82f6', '#93c5fd', '#bfdbfe'],
+      A3: ['#ef4444', '#fca5a5', '#fecaca']
     };
-    const defaultPalette = ['#7e22ce','#a78bfa','#c4b5fd'];
-    const completedColor = '#9ca3af';
+    const defPal = ['#7e22ce', '#a78bfa', '#c4b5fd'];
 
-    function Pill({ title, label, icon='fa-arrow-right', bgColor, onClick }) {
-      return (
-        <button
-          onClick={onClick}
-          style={{ backgroundColor: bgColor, borderColor: bgColor }}
-          className="relative w-full text-left rounded-lg border flex flex-col px-4 py-2 transition hover:opacity-90 focus:outline-none"
-        >
-          {title && <span className="text-xs text-white/80 tracking-wide mb-[2px]">{title}</span>}
-          <span className="text-base font-semibold text-white">{label}</span>
-          <i className={`fa ${icon} text-white absolute right-3 top-1/2 -translate-y-1/2`} />
-        </button>
-      );
-    }
+    const Pill = ({ title, label, color, onClick }) => (
+      <button onClick={onClick} style={{ backgroundColor: color }} className="w-full text-left rounded-lg px-4 py-2 text-white relative overflow-hidden hover:opacity-90">
+        {title && <span className="text-xs opacity-80 block leading-none">{title}</span>}
+        <span className="text-base font-semibold">{label}</span>
+        <i className="fa fa-arrow-right absolute right-3 top-1/2 -translate-y-1/2" />
+      </button>
+    );
 
-    function Quiz({ meta, prompts, distractors, onExit }) {
-      const TOTAL = 15; // number of questions per round
-      const [cur, setCur] = useState(null);
-      const [opts, setOpts] = useState([]);
-      const [pick, setPick] = useState(null);
+    const Loader = () => (
+      <div className="fixed inset-0 flex items-center justify-center bg-white z-50"><span className="text-gray-400">Loading…</span></div>
+    );
+
+    function Quiz({ data, onExit }) {
+      const TOTAL = 15;
       const [count, setCount] = useState(0);
-      const [fb, setFb]   = useState(null);
+      const [cur, setCur] = useState(null);
+      const [options, setOptions] = useState([]);
+      const [pick, setPick] = useState('');
+      const [feedback, setFeedback] = useState('');
 
-      // shuffle helper
       const shuffle = a => [...a].sort(() => Math.random() - 0.5);
 
-      // generate next question
-      function nextQ() {
-        const p     = prompts[Math.floor(Math.random()*prompts.length)];
-        const wrong = shuffle(prompts.filter(x => x !== p))[0];
-        const extra = shuffle(distractors).slice(0,2);
+      const nextQ = () => {
+        const p = data.correct[Math.floor(Math.random() * data.correct.length)];
+        const wrong = shuffle(data.correct.filter(x => x !== p))[0];
+        const extra = shuffle(data.distractors).slice(0, 2);
         setCur(p);
-        setOpts(shuffle([p.it, wrong.it, ...extra.map(e => e.it)]));
-        setPick(null);
-        setFb(null);
-        safeSpeak(p.it);
-      }
+        setOptions(shuffle([p.it, wrong.it, ...extra.map(e => e.it)]));
+        setPick('');
+        setFeedback('');
+        speak(p.it);
+      };
 
-      useEffect(() => {
-        if (prompts.length && distractors.length) nextQ();
-      }, [prompts, distractors]);
+      useEffect(() => { if (data) nextQ(); }, [data]);
 
-      const progress = Math.round((count/TOTAL)*100);
-
-      function check() {
+      const check = () => {
         if (!pick) return;
         if (pick === cur.it) {
-          setFb('correct');
-          setCount(c => c+1);
-          setTimeout(() => (count+1 < TOTAL ? nextQ() : onExit()), 700);
+          setFeedback('correct');
+          setCount(c => c + 1);
+          setTimeout(() => {
+            if (count + 1 < TOTAL) nextQ(); else onExit();
+          }, 600);
         } else {
-          setFb('wrong');
-          safeSpeak(cur.it);
+          setFeedback('wrong');
+          speak(cur.it);
         }
-      }
+      };
+
+      const prog = Math.round((count / TOTAL) * 100);
 
       return (
         <div className="space-y-6">
-          {/* top bar */}
           <div className="flex items-center gap-4">
-            <button onClick={onExit} className="text-gray-400 hover:text-gray-600">
-              <i className="fa fa-xmark fa-xl" />
-            </button>
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500" style={{width: `${progress}%`}} />
-            </div>
+            <button className="text-gray-400" onClick={onExit}><i className="fa fa-xmark fa-xl" /></button>
+            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${prog}%` }} /></div>
           </div>
-
-          {/* speak button */}
-          <button onClick={() => safeSpeak(cur?.it)} className="bg-blue-500 text-white w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-lg active:scale-95">
-            <i className="fa fa-volume-up fa-2x" />
-          </button>
-
-          {/* options */}
+          <button className="w-20 h-20 mx-auto bg-blue-500 text-white rounded-full flex items-center justify-center shadow" onClick={() => speak(cur?.it)}><i className="fa fa-volume-up fa-2x" /></button>
           <div className="space-y-3">
-            {opts.map(o => (
-              <button
-                key={o}
-                onClick={() => setPick(o)}
-                className={`w-full text-left py-2 px-4 rounded-lg border ${pick===o?'border-blue-600 bg-blue-50':'border-gray-300'}`}
-              >{o}</button>
+            {options.map(o => (
+              <button key={o} onClick={() => setPick(o)} className={`w-full border rounded-lg px-4 py-2 text-left ${pick === o ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>{o}</button>
             ))}
           </div>
-
-          {/* feedback card */}
-          {fb && (
-            <div className={`p-6 rounded-lg shadow text-center space-y-1 ${fb==='correct'?'bg-green-50 border border-green-300':'bg-red-50 border border-red-300'}`}>
-              {fb==='correct' ? (
-                <>
-                  <div className="text-2xl font-bold text-green-600">Bravo!</div>
-                  <div className="text-green-700">Ottimo lavoro!</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-2xl font-bold text-red-600">Oops!</div>
-                  <div className="text-red-700">La risposta corretta era <strong>{cur.it}</strong>.</div>
-                </>
-              )}
+          {feedback && (
+            <div className={`p-4 rounded-lg text-center ${feedback === 'correct' ? 'bg-green-50 border border-green-300' : 'bg-red-50 border border-red-300'}`}>
+              {feedback === 'correct' ? 'Bravo!' : `La risposta corretta era ${cur.it}`}
             </div>
           )}
-
-          {/* action button */}
-          <button onClick={fb? ()=>{setFb(null);}:check} disabled={!pick && !fb} className="w-full py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">
-            {fb ? 'Continua' : 'Controlla'}
-          </button>
+          <button disabled={!pick} onClick={check} className="w-full py-2 bg-green-600 text-white rounded disabled:opacity-50">{feedback ? 'Prossimo' : 'Controlla'}</button>
         </div>
       );
     }
 
-    /* -------------------------------------------------------------
-     *  MAIN BROWSER COMPONENT
-     * -----------------------------------------------------------*/
-
-    function Browser() {
+    function App() {
       const [topics, setTopics] = useState(null);
-      const [activeTopic, setActiveTopic] = useState('');
+      const [active, setActive] = useState(null);
 
-      // fetch TSV once on mount
       useEffect(() => {
         fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vRJELEbRqHtvqYSiDxrJ0ZTASU2IDmmpICfkU4JIt3xlnd66xbhZ4KJgtDY29Fe3XR3TD0n76rSBE6y/pub?output=tsv')
           .then(r => r.text())
-          .then(parseTsvData)
+          .then(parseTsv)
           .then(setTopics)
-          .catch(err => console.error('Failed fetching sheet:', err));
+          .catch(err => console.error('Sheet fetch error:', err));
       }, []);
 
-      const levels           = useMemo(() => topics ? [...new Set(topics.map(t => t.level))] : [], [topics]);
-      const unitsByLevel     = useMemo(() => {
-        const m = {}; if (!topics) return m;
-        topics.forEach(t => { if (!m[t.level]) m[t.level]=new Set(); m[t.level].add(t.unit); });
+      const levels = useMemo(() => topics ? [...new Set(topics.map(t => t.level))] : [], [topics]);
+      const unitsByLevel = useMemo(() => {
+        if (!topics) return {};
+        const m = {};
+        topics.forEach(t => {
+          if (!m[t.level]) m[t.level] = new Set();
+          m[t.level].add(t.unit);
+        });
         Object.keys(m).forEach(k => m[k] = [...m[k]]);
         return m;
       }, [topics]);
-      const topicsByUnit     = useMemo(() => {
-        const m = {}; if (!topics) return m;
-        topics.forEach(t => { if (!m[t.unit]) m[t.unit]=[]; m[t.unit].push(t); });
+      const topicsByUnit = useMemo(() => {
+        if (!topics) return {};
+        const m = {};
+        topics.forEach(t => {
+          if (!m[t.unit]) m[t.unit] = [];
+          m[t.unit].push(t);
+        });
         return m;
       }, [topics]);
 
-      // render
-      if (!topics) return <Loader/>;
+      if (!topics) return <Loader />;
+
+      if (active) {
+        const data = topics.find(t => t.topic === active);
+        return <Quiz data={data} onExit={() => setActive(null)} />;
+      }
 
       return (
-        <div className="max-w-md mx-auto p-4 space-y-5">
-          {!activeTopic ? (
-            levels.map(level => {
-              const palette = paletteSets[level] || defaultPalette;
-              return (
-                <div key={level} className="space-y-2">
-                  <Pill label={level} title="LEVEL" bgColor={palette[0]} onClick={()=>{}} />
-                  <div className="pl-4 space-y-2">
-                    {unitsByLevel[level].map(unit => (
-                      <div key={unit} className="space-y-2">
-                        <Pill label={unit} title="UNIT" bgColor={palette[1]} onClick={()=>{}} />
-                        <div className="pl-4 space-y-2">
-                          {topicsByUnit[unit].map(t => (
-                            <Pill key={t.topic} label={t.topic} bgColor={palette[2]} onClick={()=>setActiveTopic(t.topic)} />
-                          ))}
-                        </div>
-                      </
+        <div className="max-w-md mx-auto p-4 space-y-4">
+          {levels.map(lvl => {
+            const pal = palette[lvl] || defPal;
+            return (
+              <div key={lvl} className="space-y-2">
+                <Pill title="LEVEL" label={lvl} color={pal[0]} onClick={() => {}} />
+                <div className="pl-4 space-y-2">
+                  {unitsByLevel[lvl].map(u => (
+                    <div key={u} className="space-y-2">
+                      <Pill title="UNIT" label={u} color={pal[1]} onClick={() => {}} />
+                      <div className="pl-4 space-y-2">
+                        {topicsByUnit[u].map(t => (
+                          <Pill key={t.topic} label={t.topic} color={pal[2]} onClick={() => setActive(t.topic)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </
