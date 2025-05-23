@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="manifest" href="manifest.json" />
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<link rel="apple-touch-icon" href="icon-192.png" />
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pong Game</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <title>Listening Quiz</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-  <script src="sw.js"></script>
+
+  <h2>What do you hear?</h2>
+  <button class="audio-button" onclick="playAudio()">🔊</button>
+
+  <div class="options" id="optionsContainer"></div>
+
+  <p><em>Can't listen now</em></p>
+  <button id="checkButton" onclick="checkAnswer()">CHECK</button>
+
+  <audio id="audio" src="audio/chat.mp3"></audio>
+
+  <script src="script.js"></script>
 </body>
 </html>
